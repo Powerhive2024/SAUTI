@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default language: Kiswahili. English lives in values-en. -->
+<resources>
+    <string name="app_name">Sauti</string>
+    <string name="status_offline">Bila mtandao</string>
+    <string name="status_online">Mtandaoni · seva ya jamii</string>
+    <string name="status_loading">Inapakia modeli…</string>
+    <string name="status_no_model">Hakuna modeli bado</string>
+    <string name="input_hint">Andika ujumbe wako…</string>
+    <string name="send">Tuma</string>
+    <string name="record">Ongea</string>
+    <string name="stop">Simama</string>
+    <string name="consent_title">Tumia mtandao?</string>
+    <string name="consent_body">Swali hili linahitaji seva ya mtandaoni. Maandishi tu (si sauti yako) yatatumwa, bila namba za simu wala majina. Hakuna kitakachohifadhiwa kwenye seva.</string>
+    <string name="consent_yes">Ndiyo, tuma</string>
+    <string name="consent_no">Hapana, jibu kwenye simu</string>
+    <string name="settings">Mipangilio</string>
+    <string name="mode_title">Mtandao</string>
+    <string name="mode_offline">Simu tu (bila mtandao kabisa)</string>
+    <string name="mode_ask">Niulize kabla ya kutumia mtandao</string>
+    <string name="mode_auto">Tumia mtandao inapohitajika (Wi-Fi tu)</string>
+    <string name="server_url">Anwani ya seva ya jamii</string>
+    <string name="model_title">Modeli kwenye simu</string>
+    <string name="import_model">Leta faili la modeli (.litertlm)</string>
+    <string name="model_hint">Unaweza kupata faili kutoka kwa rafiki kupitia kadi ya SD au Bluetooth, bila data.</string>
+    <string name="recommended_model">Simu yako inafaa: %1$s</string>
+    <string name="answered_on_device">Imejibiwa kwenye simu</string>
+    <string name="answered_online">Imejibiwa mtandaoni</string>
+    <string name="queued_offline">Hakuna mtandao. Jibu la simu limetolewa; swali limehifadhiwa ili ulitume baadaye ukitaka.</string>
+    <string name="mic_permission">Ruhusa ya kipaza sauti inahitajika kuongea na Sauti.</string>
+    <string name="back">Rudi</string>
+    <string name="act_no_model">Weka modeli ili tuanze</string>
+    <string name="act_loading">Inaandaa modeli…</string>
+    <string name="act_importing">Inaleta faili la modeli…</string>
+    <string name="act_idle">Niko tayari. Ongea au andika.</string>
+    <string name="act_listening">Nakusikiliza…</string>
+    <string name="act_understanding">Naelewa ulichosema…</string>
+    <string name="act_thinking">Nafikiri…</string>
+    <string name="act_answering">Najibu…</string>
+    <string name="act_online">Nauliza seva ya jamii…</string>
+    <string name="greeting">Habari! Mimi ni Sauti. Niulize chochote kwa Kiswahili, Sheng au Kiingereza — hata bila mtandao.</string>
+    <string name="act_speaking">Ninaongea…</string>
+    <string name="voice_mode">Ongea</string>
+    <string name="text_mode">Andika</string>
+    <string name="tap_to_speak">Bonyeza uongee</string>
+    <string name="tap_to_stop">Bonyeza kumaliza</string>
+    <string name="stop_speaking">Nyamaza</string>
+    <string name="lang_en">Kiingereza</string>
+    <string name="lang_sw">Kiswahili</string>
+    <string name="lang_sheng">Sheng</string>
+</resources>

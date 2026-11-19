@@ -1,0 +1,24 @@
+# big or local-only
+.venv/
+models/
+data/
+runs/
+results/*/*.jsonl
+*.log
+*.apk
+*.litertlm
+__pycache__/
+# laptop-only helpers (contain local paths)
+scripts/wsl_*.sh
+scripts/convert_watchdog.ps1
+scripts/jaxtest.py
+# private notes
+APPLICATION-CHECKLIST.md
+CLAUDE.md
+# android build output
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/*.log
+android/voice_ref.txt

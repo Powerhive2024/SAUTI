@@ -1,0 +1,117 @@
+{
+  "asr_fleurs_swke": {
+    "n": 40,
+    "WER": 25.45,
+    "CER": 8.72
+  },
+  "asr_sartify": {
+    "n": 40,
+    "WER": 50.94,
+    "CER": 26.71
+  },
+  "asr_afrivoice": {
+    "n": 40,
+    "WER": 13.49,
+    "CER": 3.46
+  },
+  "asr_ndizi": {
+    "n": 40,
+    "WER": 31.97,
+    "CER": 11.05
+  },
+  "asr_liva_sheng": {
+    "n": 26,
+    "WER": 92.99,
+    "CER": 49.5
+  },
+  "asr_silencio_nairobi": {
+    "n": 37,
+    "WER": 32.64,
+    "CER": 12.17
+  },
+  "txt_sheng_translate": {
+    "n": 40,
+    "chrF": 48.11,
+    "lang_match_%": 85.0,
+    "lang_family_match_%": 100.0,
+    "replies_by_expected_lang": {
+      "sheng": {
+        "sheng": 4,
+        "sw": 3
+      },
+      "sw": {
+        "sheng": 3,
+        "sw": 10
+      },
+      "en": {
+        "en": 20
+      }
+    }
+  },
+  "txt_codeswitch": {
+    "n": 40,
+    "chrF": 38.21,
+    "lang_match_%": 60.0,
+    "lang_family_match_%": 75.0,
+    "replies_by_expected_lang": {
+      "sw": {
+        "en": 3,
+        "sheng": 4,
+        "sw": 12
+      },
+      "en": {
+        "en": 12,
+        "sheng": 5
+      },
+      "sheng": {
+        "en": 2,
+        "sw": 2
+      }
+    }
+  },
+  "txt_aya_swahili": {
+    "n": 40,
+    "chrF": 18.15,
+    "lang_match_%": 97.5,
+    "lang_family_match_%": 97.5,
+    "replies_by_expected_lang": {
+      "sw": {
+        "en": 1,
+        "sw": 39
+      }
+    }
+  },
+  "txt_english": {
+    "n": 40,
+    "chrF": 31.93,
+    "lang_match_%": 85.0,
+    "lang_family_match_%": 85.0,
+    "replies_by_expected_lang": {
+      "en": {
+        "en": 34,
+        "sw": 6
+      }
+    }
+  },
+  "txt_lang_follow": {
+    "n": 30,
+    "lang_match_%": 100.0,
+    "lang_family_match_%": 100.0,
+    "replies_by_expected_lang": {
+      "en": {
+        "en": 10
+      },
+      "sw": {
+        "sw": 10
+      },
+      "sheng": {
+        "sheng": 10
+      }
+    }
+  },
+  "_edge": {
+    "peak_vram_gb": 8.56,
+    "gen_tokens_per_s_median": 7.3,
+    "note": "4-bit NF4 on RTX 4080 Laptop; on-device numbers measured separately"
+  }
+}

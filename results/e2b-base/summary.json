@@ -1,0 +1,119 @@
+{
+  "asr_fleurs_swke": {
+    "n": 40,
+    "WER": 61.29,
+    "CER": 41.85
+  },
+  "asr_sartify": {
+    "n": 40,
+    "WER": 80.16,
+    "CER": 110.99
+  },
+  "asr_afrivoice": {
+    "n": 40,
+    "WER": 42.6,
+    "CER": 23.55
+  },
+  "asr_ndizi": {
+    "n": 40,
+    "WER": 80.8,
+    "CER": 50.33
+  },
+  "asr_liva_sheng": {
+    "n": 26,
+    "WER": 91.17,
+    "CER": 83.26
+  },
+  "asr_silencio_nairobi": {
+    "n": 37,
+    "WER": 37.18,
+    "CER": 12.95
+  },
+  "txt_sheng_translate": {
+    "n": 40,
+    "chrF": 26.98,
+    "lang_match_%": 72.5,
+    "lang_family_match_%": 90.0,
+    "replies_by_expected_lang": {
+      "sheng": {
+        "sheng": 1,
+        "sw": 6
+      },
+      "sw": {
+        "en": 1,
+        "sheng": 1,
+        "sw": 11
+      },
+      "en": {
+        "en": 17,
+        "sheng": 3
+      }
+    }
+  },
+  "txt_codeswitch": {
+    "n": 40,
+    "chrF": 34.1,
+    "lang_match_%": 50.0,
+    "lang_family_match_%": 52.5,
+    "replies_by_expected_lang": {
+      "sw": {
+        "en": 10,
+        "sheng": 1,
+        "sw": 8
+      },
+      "en": {
+        "en": 10,
+        "sheng": 7
+      },
+      "sheng": {
+        "en": 2,
+        "sheng": 2
+      }
+    }
+  },
+  "txt_aya_swahili": {
+    "n": 40,
+    "chrF": 25.99,
+    "lang_match_%": 85.0,
+    "lang_family_match_%": 85.0,
+    "replies_by_expected_lang": {
+      "sw": {
+        "en": 6,
+        "sw": 34
+      }
+    }
+  },
+  "txt_english": {
+    "n": 40,
+    "chrF": 35.5,
+    "lang_match_%": 92.5,
+    "lang_family_match_%": 92.5,
+    "replies_by_expected_lang": {
+      "en": {
+        "en": 37,
+        "sw": 3
+      }
+    }
+  },
+  "txt_lang_follow": {
+    "n": 30,
+    "lang_match_%": 100.0,
+    "lang_family_match_%": 100.0,
+    "replies_by_expected_lang": {
+      "en": {
+        "en": 10
+      },
+      "sw": {
+        "sw": 10
+      },
+      "sheng": {
+        "sheng": 10
+      }
+    }
+  },
+  "_edge": {
+    "peak_vram_gb": 8.48,
+    "gen_tokens_per_s_median": 9.7,
+    "note": "4-bit NF4 on RTX 4080 Laptop; on-device numbers measured separately"
+  }
+}
