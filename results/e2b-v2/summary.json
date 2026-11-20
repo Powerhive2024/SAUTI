@@ -1,0 +1,118 @@
+{
+  "asr_fleurs_swke": {
+    "n": 40,
+    "WER": 27.36,
+    "CER": 10.09
+  },
+  "asr_sartify": {
+    "n": 40,
+    "WER": 113.4,
+    "CER": 78.83
+  },
+  "asr_afrivoice": {
+    "n": 40,
+    "WER": 14.37,
+    "CER": 4.03
+  },
+  "asr_ndizi": {
+    "n": 40,
+    "WER": 30.63,
+    "CER": 10.85
+  },
+  "asr_liva_sheng": {
+    "n": 26,
+    "WER": 64.79,
+    "CER": 32.29
+  },
+  "asr_silencio_nairobi": {
+    "n": 37,
+    "WER": 25.95,
+    "CER": 7.7
+  },
+  "txt_sheng_translate": {
+    "n": 40,
+    "chrF": 49.46,
+    "lang_match_%": 77.5,
+    "lang_family_match_%": 100.0,
+    "replies_by_expected_lang": {
+      "sheng": {
+        "sheng": 1,
+        "sw": 6
+      },
+      "sw": {
+        "sheng": 3,
+        "sw": 10
+      },
+      "en": {
+        "en": 20
+      }
+    }
+  },
+  "txt_codeswitch": {
+    "n": 40,
+    "chrF": 37.3,
+    "lang_match_%": 50.0,
+    "lang_family_match_%": 72.5,
+    "replies_by_expected_lang": {
+      "sw": {
+        "en": 2,
+        "sheng": 7,
+        "sw": 10
+      },
+      "en": {
+        "en": 10,
+        "sheng": 7
+      },
+      "sheng": {
+        "en": 2,
+        "sw": 2
+      }
+    }
+  },
+  "txt_aya_swahili": {
+    "n": 40,
+    "chrF": 16.96,
+    "lang_match_%": 100.0,
+    "lang_family_match_%": 100.0,
+    "replies_by_expected_lang": {
+      "sw": {
+        "sw": 40
+      }
+    }
+  },
+  "txt_english": {
+    "n": 40,
+    "chrF": 25.73,
+    "lang_match_%": 72.5,
+    "lang_family_match_%": 72.5,
+    "replies_by_expected_lang": {
+      "en": {
+        "en": 29,
+        "sw": 11
+      }
+    }
+  },
+  "txt_lang_follow": {
+    "n": 30,
+    "lang_match_%": 86.7,
+    "lang_family_match_%": 96.7,
+    "replies_by_expected_lang": {
+      "en": {
+        "en": 9,
+        "sw": 1
+      },
+      "sw": {
+        "sw": 10
+      },
+      "sheng": {
+        "sheng": 7,
+        "sw": 3
+      }
+    }
+  },
+  "_edge": {
+    "peak_vram_gb": 8.56,
+    "gen_tokens_per_s_median": 4.2,
+    "note": "4-bit NF4 on RTX 4080 Laptop; on-device numbers measured separately"
+  }
+}
