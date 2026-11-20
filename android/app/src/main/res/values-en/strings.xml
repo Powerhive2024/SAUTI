@@ -47,4 +47,24 @@
     <string name="lang_en">English</string>
     <string name="lang_sw">Kiswahili</string>
     <string name="lang_sheng">Sheng</string>
+    <!-- Conversation history (kept on this phone only) -->
+    <string name="history">History</string>
+    <string name="history_title">Your conversations</string>
+    <string name="history_settings_title">Conversation history</string>
+    <string name="new_chat">New conversation</string>
+    <string name="history_empty">No saved conversations yet.\nThey will show up here after you talk to Sauti.</string>
+    <string name="history_privacy">Kept only on this phone. Never sent anywhere or synced online. When you speak, only the text of what you said is saved, never your voice.</string>
+    <string name="history_save_off">History is off: new conversations won\'t be saved. Ones already saved stay until you delete them.</string>
+    <string name="history_save">Save conversations on this phone</string>
+    <string name="history_size">Saved conversations: %1$d · %2$s on this phone</string>
+    <string name="history_messages">Messages: %1$d</string>
+    <string name="history_current">Open now</string>
+    <string name="history_untitled">Conversation</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete_chat_title">Delete this conversation?</string>
+    <string name="delete_chat_body">It will be erased from this phone for good. This can\'t be undone.</string>
+    <string name="delete_all">Delete all history</string>
+    <string name="delete_all_title">Delete all history?</string>
+    <string name="delete_all_body">Every saved conversation (%1$d) will be erased from this phone for good. This can\'t be undone.</string>
 </resources>

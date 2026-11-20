@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
@@ -56,6 +57,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -110,7 +112,7 @@ fun Activity.label(): String = stringResource(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(ui: UiState, vm: ChatViewModel, voiceMode: Boolean, onMic: () -> Unit, onSettings: () -> Unit) {
+fun ChatScreen(ui: UiState, vm: ChatViewModel, voiceMode: Boolean, onMic: () -> Unit, onSettings: () -> Unit, onHistory: () -> Unit) {
     var input by remember { mutableStateOf("") }
     val list = rememberLazyListState()
     LaunchedEffect(ui.messages.size, ui.messages.lastOrNull()?.text?.length) {
@@ -141,19 +143,31 @@ fun ChatScreen(ui: UiState, vm: ChatViewModel, voiceMode: Boolean, onMic: () -> 
                 },
                 actions = {
                     // Voice ⇄ Text: how you talk to Sauti, and whether it talks back
+                    // On narrow (cheap) phones the toggle shows icons only, so the title never gets squeezed.
+                    val compact = LocalConfiguration.current.screenWidthDp < 440
                     SingleChoiceSegmentedButtonRow(Modifier.padding(end = 4.dp)) {
                         SegmentedButton(
                             selected = voiceMode, onClick = { vm.setVoiceMode(true) },
                             shape = SegmentedButtonDefaults.itemShape(0, 2),
-                            icon = { Icon(Icons.Default.RecordVoiceOver, null, Modifier.size(18.dp)) },
-                        ) { Text(stringResource(R.string.voice_mode)) }
+                            icon = { if (!compact) Icon(Icons.Default.RecordVoiceOver, null, Modifier.size(18.dp)) },
+                        ) {
+                            if (compact) Icon(Icons.Default.RecordVoiceOver, stringResource(R.string.voice_mode), Modifier.size(18.dp))
+                            else Text(stringResource(R.string.voice_mode))
+                        }
                         SegmentedButton(
                             selected = !voiceMode, onClick = { vm.setVoiceMode(false) },
                             shape = SegmentedButtonDefaults.itemShape(1, 2),
-                            icon = { Icon(Icons.Default.Keyboard, null, Modifier.size(18.dp)) },
-                        ) { Text(stringResource(R.string.text_mode)) }
+                            icon = { if (!compact) Icon(Icons.Default.Keyboard, null, Modifier.size(18.dp)) },
+                        ) {
+                            if (compact) Icon(Icons.Default.Keyboard, stringResource(R.string.text_mode), Modifier.size(18.dp))
+                            else Text(stringResource(R.string.text_mode))
+                        }
                     }
-                    IconButton(onClick = { vm.newChat() }) { Icon(Icons.Default.Add, null) }
+                    IconButton(onClick = onHistory) { Icon(Icons.Default.History, stringResource(R.string.history)) }
+                    // "New conversation" only when there is a conversation to leave
+                    if (ui.messages.isNotEmpty()) IconButton(onClick = { vm.newChat() }) {
+                        Icon(Icons.Default.Add, stringResource(R.string.new_chat))
+                    }
                     IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, stringResource(R.string.settings)) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Sauti.surface),

@@ -10,6 +10,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.LoraConfig
+import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +40,8 @@ class EdgeEngine(private val context: Context) {
     private val lock = Mutex()
     private var engine: Engine? = null
     private var conversation: Conversation? = null
+    /** Earlier turns of a reopened conversation, replayed into the model's context (text only). */
+    private var seed: List<Message> = emptyList()
     var loadedPath: String? = null; private set
     var backendName: String = "-"; private set
 
@@ -83,6 +86,7 @@ class EdgeEngine(private val context: Context) {
 
     private fun conversationConfig(loraPath: String?) = ConversationConfig(
         systemInstruction = Contents.of(SYSTEM_PROMPT),
+        initialMessages = seed,
         samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.6),
         loraConfig = loraPath?.let { LoraConfig(loraPath = it, audioLoraPath = it) },
     )
@@ -130,9 +134,13 @@ class EdgeEngine(private val context: Context) {
 
     fun cancel() = conversation?.cancelProcess()
 
-    /** Starts a fresh chat (clears on-device context). */
-    suspend fun reset(loraPath: String?) = withContext(Dispatchers.IO) {
+    /**
+     * Starts a fresh chat (clears on-device context). [history] = earlier (fromUser, text) turns of a
+     * reopened conversation, so the model remembers it; only the most recent ones that fit are kept.
+     */
+    suspend fun reset(loraPath: String?, history: List<Pair<Boolean, String>> = emptyList()) = withContext(Dispatchers.IO) {
         lock.withLock {
+            seed = seedFrom(history)
             conversation?.close()
             conversation = engine?.createConversation(conversationConfig(loraPath))
         }
@@ -150,6 +158,22 @@ class EdgeEngine(private val context: Context) {
 
     companion object {
         private const val TAG = "EdgeEngine"
+        /** Context budget for a replayed conversation (~1k tokens of the 2048), so the new reply still fits. */
+        private const val SEED_CHARS = 3000
+        private const val SEED_TURN_CHARS = 600
+
+        private fun seedFrom(history: List<Pair<Boolean, String>>): List<Message> {
+            val picked = ArrayDeque<Pair<Boolean, String>>()
+            var used = 0
+            for ((user, text) in history.asReversed()) {
+                val t = text.trim().take(SEED_TURN_CHARS)
+                if (t.isEmpty()) continue
+                if (used + t.length > SEED_CHARS) break
+                picked.addFirst(user to t); used += t.length
+            }
+            while (picked.isNotEmpty() && !picked.first().first) picked.removeFirst() // start on a user turn
+            return picked.map { (user, t) -> if (user) Message.user(t) else Message.model(t) }
+        }
         private const val HOLD_BACK = 64
     }
 }

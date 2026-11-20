@@ -19,6 +19,8 @@ data class Settings(
     val loraPath: String? = null,
     /** Voice mode: speak to Sauti and hear the reply. Text mode: type and read. */
     val voiceMode: Boolean = true,
+    /** Keep conversations on this phone (never synced or sent anywhere). The user can turn it off. */
+    val saveHistory: Boolean = true,
 )
 
 private val Context.dataStore by preferencesDataStore(name = "sauti_settings")
@@ -29,6 +31,7 @@ class SettingsRepository(private val context: Context) {
     private val kModel = stringPreferencesKey("model_path")
     private val kLora = stringPreferencesKey("lora_path")
     private val kVoice = booleanPreferencesKey("voice_mode")
+    private val kHistory = booleanPreferencesKey("save_history")
 
     val settings: Flow<Settings> = context.dataStore.data.map { p ->
         Settings(
@@ -37,6 +40,7 @@ class SettingsRepository(private val context: Context) {
             modelPath = p[kModel],
             loraPath = p[kLora],
             voiceMode = p[kVoice] ?: true,
+            saveHistory = p[kHistory] ?: true,
         )
     }
 
@@ -44,6 +48,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setServerUrl(u: String) = context.dataStore.edit { it[kServer] = u.trim() }
     suspend fun setModelPath(p: String) = context.dataStore.edit { it[kModel] = p }
     suspend fun setVoiceMode(on: Boolean) = context.dataStore.edit { it[kVoice] = on }
+    suspend fun setSaveHistory(on: Boolean) = context.dataStore.edit { it[kHistory] = on }
     suspend fun setLoraPath(p: String?) = context.dataStore.edit {
         if (p == null) it.remove(kLora) else it[kLora] = p
     }

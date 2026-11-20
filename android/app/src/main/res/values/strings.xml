@@ -48,4 +48,24 @@
     <string name="lang_en">Kiingereza</string>
     <string name="lang_sw">Kiswahili</string>
     <string name="lang_sheng">Sheng</string>
+    <!-- Conversation history (kept on this phone only) -->
+    <string name="history">Historia</string>
+    <string name="history_title">Mazungumzo yako</string>
+    <string name="history_settings_title">Historia ya mazungumzo</string>
+    <string name="new_chat">Mazungumzo mapya</string>
+    <string name="history_empty">Bado hakuna mazungumzo yaliyohifadhiwa.\nYataonekana hapa baada ya kuongea na Sauti.</string>
+    <string name="history_privacy">Yanahifadhiwa kwenye simu hii tu. Hayatumwi popote wala kusawazishwa mtandaoni. Ukiongea, maandishi ya ulichosema ndiyo yanahifadhiwa, si sauti yako.</string>
+    <string name="history_save_off">Historia imezimwa: mazungumzo mapya hayatahifadhiwa. Yaliyokwisha hifadhiwa yanabaki hadi uyafute.</string>
+    <string name="history_save">Hifadhi mazungumzo kwenye simu hii</string>
+    <string name="history_size">Mazungumzo %1$d · %2$s kwenye simu</string>
+    <string name="history_messages">jumbe %1$d</string>
+    <string name="history_current">Yaliyo wazi</string>
+    <string name="history_untitled">Mazungumzo</string>
+    <string name="delete">Futa</string>
+    <string name="cancel">Ghairi</string>
+    <string name="delete_chat_title">Futa mazungumzo haya?</string>
+    <string name="delete_chat_body">Yatafutwa kwenye simu hii kabisa. Huwezi kuyarudisha.</string>
+    <string name="delete_all">Futa historia yote</string>
+    <string name="delete_all_title">Futa historia yote?</string>
+    <string name="delete_all_body">Mazungumzo yote (%1$d) yatafutwa kwenye simu hii kabisa. Huwezi kuyarudisha.</string>
 </resources>

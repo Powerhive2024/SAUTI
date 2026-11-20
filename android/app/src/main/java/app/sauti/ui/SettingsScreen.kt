@@ -19,7 +19,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -33,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.sauti.R
+import app.sauti.history.ConversationSummary
+import app.sauti.ui.theme.Sauti
 import app.sauti.settings.NetworkMode
 import app.sauti.settings.Settings
 
@@ -45,8 +49,12 @@ fun SettingsScreen(
     onMode: (NetworkMode) -> Unit,
     onServer: (String) -> Unit,
     onImport: () -> Unit,
+    history: List<ConversationSummary>,
+    onSaveHistory: (Boolean) -> Unit,
+    onDeleteAll: () -> Unit,
     onBack: () -> Unit,
 ) {
+    var confirmAll by remember { mutableStateOf(false) }
     var server by remember(settings.serverUrl) { mutableStateOf(settings.serverUrl) }
     Scaffold(topBar = {
         TopAppBar(
@@ -90,10 +98,31 @@ fun SettingsScreen(
                 enabled = settings.mode != NetworkMode.OFFLINE_ONLY,
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
             )
+
+            // Conversation history: what is kept, where, and a way to erase it all
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            Text(stringResource(R.string.history_settings_title), style = MaterialTheme.typography.titleMedium)
+            Row(
+                Modifier.fillMaxWidth().selectable(settings.saveHistory) { onSaveHistory(!settings.saveHistory) }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.history_save), Modifier.weight(1f))
+                Switch(checked = settings.saveHistory, onCheckedChange = onSaveHistory)
+            }
+            Spacer(Modifier.height(4.dp))
+            PrivacyNote(if (settings.saveHistory) R.string.history_privacy else R.string.history_save_off)
+            Spacer(Modifier.height(8.dp))
+            val kb = (history.sumOf { it.bytes } + 1023) / 1024
+            Text(stringResource(R.string.history_size, history.size, "$kb KB"), style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = { confirmAll = true }, enabled = history.isNotEmpty()) {
+                Text(stringResource(R.string.delete_all), color = if (history.isNotEmpty()) Sauti.error else Sauti.outline)
+            }
             if (ui.laterQueue.isNotEmpty()) {
                 HorizontalDivider(Modifier.padding(vertical = 16.dp))
                 Text("⏳ " + ui.laterQueue.size, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
+    if (confirmAll) DeleteAllDialog(history.size, onConfirm = { onDeleteAll(); confirmAll = false }, onDismiss = { confirmAll = false })
 }

@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.sauti.ui.ChatScreen
 import app.sauti.ui.ChatViewModel
+import app.sauti.ui.HistoryScreen
 import app.sauti.ui.SettingsScreen
 import app.sauti.ui.theme.SautiTheme
 
@@ -56,9 +57,23 @@ class MainActivity : ComponentActivity() {
             SautiTheme {
                 val ui by vm.ui.collectAsStateWithLifecycle()
                 val settings by vm.settings.collectAsStateWithLifecycle()
+                val history by vm.history.collectAsStateWithLifecycle()
                 var showSettings by remember { mutableStateOf(false) }
+                var showHistory by remember { mutableStateOf(false) }
 
-                if (showSettings) {
+                if (showHistory) {
+                    BackHandler { showHistory = false }
+                    HistoryScreen(
+                        history = history,
+                        currentId = ui.conversationId,
+                        saving = settings.saveHistory,
+                        onOpen = { vm.openConversation(it); showHistory = false },
+                        onNew = { vm.newChat(); showHistory = false },
+                        onDelete = { vm.deleteConversation(it) },
+                        onDeleteAll = { vm.deleteAllHistory() },
+                        onBack = { showHistory = false },
+                    )
+                } else if (showSettings) {
                     BackHandler { showSettings = false }
                     SettingsScreen(
                         settings = settings,
@@ -67,6 +82,9 @@ class MainActivity : ComponentActivity() {
                         onMode = { vm.setMode(it) },
                         onServer = { vm.setServer(it) },
                         onImport = { pickModel.launch(arrayOf("*/*")) },
+                        history = history,
+                        onSaveHistory = { vm.setSaveHistory(it) },
+                        onDeleteAll = { vm.deleteAllHistory() },
                         onBack = { showSettings = false },
                     )
                 } else {
@@ -80,6 +98,7 @@ class MainActivity : ComponentActivity() {
                             if (granted) vm.startRecording() else micPermission.launch(Manifest.permission.RECORD_AUDIO)
                         },
                         onSettings = { showSettings = true },
+                        onHistory = { showHistory = true },
                     )
                 }
             }

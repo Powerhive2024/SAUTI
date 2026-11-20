@@ -5,6 +5,7 @@ import app.sauti.cloud.CloudClient
 import app.sauti.device.DeviceProfile
 import app.sauti.edge.EdgeEngine
 import app.sauti.edge.ModelStore
+import app.sauti.history.HistoryStore
 import app.sauti.router.Router
 import app.sauti.settings.SettingsRepository
 import app.sauti.voice.Speaker
@@ -18,6 +19,7 @@ class SautiApp : Application() {
     lateinit var cloud: CloudClient; private set
     lateinit var router: Router; private set
     lateinit var speaker: Speaker; private set
+    lateinit var history: HistoryStore; private set
 
     override fun onCreate() {
         super.onCreate()
@@ -28,5 +30,6 @@ class SautiApp : Application() {
         cloud = CloudClient()
         router = Router(device)
         speaker = Speaker(this)
+        history = HistoryStore(java.io.File(filesDir, "history")) // app-private, on this phone only
     }
 }

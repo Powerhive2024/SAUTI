@@ -8,6 +8,9 @@ import app.sauti.SautiApp
 import app.sauti.audio.VoiceRecorder
 import app.sauti.cloud.CloudClient
 import app.sauti.edge.SYSTEM_PROMPT
+import app.sauti.history.ConversationSummary
+import app.sauti.history.HistoryStore
+import app.sauti.history.SavedConversation
 import app.sauti.lang.Lang
 import app.sauti.lang.LanguageDetector
 import app.sauti.privacy.Redactor
@@ -15,6 +18,8 @@ import app.sauti.router.Route
 import app.sauti.settings.NetworkMode
 import app.sauti.settings.Settings
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +62,8 @@ data class UiState(
     val consent: PendingConsent? = null,
     val laterQueue: List<String> = emptyList(),
     val importProgress: Float? = null,
+    /** Id of the saved conversation on screen (null = new, not saved yet). */
+    val conversationId: String? = null,
 )
 
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
@@ -66,6 +73,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private var genJob: Job? = null
     /** The conversation's current language; follows whatever the user last spoke or typed. */
     private var lang: Lang? = null
+    private var createdAt = 0L
+    /** Conversations the user deleted: a reply still finishing in the background must not bring them back. */
+    private val deleted = mutableSetOf<String>()
+
+    /** Past conversations, kept only on this phone (newest first). */
+    private val _history = MutableStateFlow<List<ConversationSummary>>(emptyList())
+    val history: StateFlow<List<ConversationSummary>> = _history.asStateFlow()
 
     private val _ui = MutableStateFlow(UiState())
     val ui: StateFlow<UiState> = _ui.asStateFlow()
@@ -73,6 +87,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     val recommendedTier get() = s.device.recommendedTier()
 
     init {
+        refreshHistory()
         // when Sauti finishes talking, go back to "ready"
         viewModelScope.launch {
             s.speaker.speaking.collect { talking ->
@@ -170,8 +185,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             when (d.route) {
                 Route.EDGE -> answerOnDevice(question, wav)
                 Route.ONLINE -> answerOnline(question, d.reason)
-                Route.ASK_CONSENT -> _ui.update {
-                    it.copy(busy = false, activity = Activity.IDLE, consent = PendingConsent(question, d.reason, userMsg.id))
+                Route.ASK_CONSENT -> {
+                    _ui.update { it.copy(busy = false, activity = Activity.IDLE, consent = PendingConsent(question, d.reason, userMsg.id)) }
+                    persist()
                 }
             }
         }
@@ -239,16 +255,80 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun cancel() {
         s.edge.cancel(); genJob?.cancel(); _ui.update { it.copy(busy = false, activity = idleOr()) }
+        persist()
     }
 
-    fun newChat() = viewModelScope.launch {
+    fun newChat(save: Boolean = true) = viewModelScope.launch {
+        stopTurn(save)
         s.edge.reset(settings.value.loraPath)
         lang = null
-        _ui.update { it.copy(messages = emptyList()) }
+        _ui.update { it.copy(messages = emptyList(), conversationId = null, consent = null) }
     }
 
-    private fun finishTurn() = _ui.update {
-        it.copy(busy = false, activity = if (s.speaker.speaking.value) Activity.SPEAKING else Activity.IDLE)
+    // ---------------------------------------------------------------- history (on this phone only)
+    fun setSaveHistory(on: Boolean) = viewModelScope.launch {
+        s.settings.setSaveHistory(on)
+        if (on) persist() // start keeping the conversation that is open now
+    }
+
+    /** Reopens a saved conversation; the model gets its earlier turns back so the chat can go on. */
+    fun openConversation(id: String) = viewModelScope.launch {
+        if (id == _ui.value.conversationId) return@launch
+        val c = s.history.load(id) ?: run { refreshHistory(); return@launch }
+        stopTurn()
+        s.edge.reset(settings.value.loraPath, c.messages.map { it.fromUser to it.text.removePrefix(HistoryStore.VOICE_PREFIX) })
+        nextId = (c.messages.maxOfOrNull { it.id } ?: 0L) + 1
+        lang = c.messages.lastOrNull { !it.fromUser && it.lang != null }?.lang
+        createdAt = c.createdAt
+        _ui.update { it.copy(messages = c.messages, conversationId = c.id, consent = null, activity = idleOr()) }
+    }
+
+    fun deleteConversation(id: String) = viewModelScope.launch {
+        deleted += id
+        s.history.delete(id)
+        if (id == _ui.value.conversationId) newChat(save = false).join()
+        refreshHistory()
+    }
+
+    fun deleteAllHistory() = viewModelScope.launch {
+        _ui.value.conversationId?.let { deleted += it }
+        newChat(save = false).join()
+        s.history.deleteAll()
+        refreshHistory()
+    }
+
+    private fun refreshHistory() = viewModelScope.launch { _history.value = s.history.list() }
+
+    /** Stops whatever Sauti is doing (and saves what's on screen) before switching conversation. */
+    private suspend fun stopTurn(save: Boolean = true) {
+        stopSpeaking()
+        if (_ui.value.recording) recorder.stop()
+        if (_ui.value.busy) { s.edge.cancel(); genJob?.cancel() }
+        _ui.update { it.copy(busy = false, activity = idleOr()) }
+        if (save) saveNow()
+    }
+
+    /** Saves the conversation on screen, if history is on and there is something to keep. */
+    private fun persist() = viewModelScope.launch { saveNow() }
+
+    private suspend fun saveNow() = withContext(NonCancellable) {
+        if (!settings.value.saveHistory) return@withContext
+        val u = _ui.value
+        val msgs = HistoryStore.keepable(u.messages)
+        if (msgs.none { it.fromUser } || u.conversationId in deleted) return@withContext
+        val id = u.conversationId ?: HistoryStore.newId().also { newId ->
+            createdAt = System.currentTimeMillis()
+            _ui.update { if (it.conversationId == null) it.copy(conversationId = newId) else it }
+        }
+        runCatching {
+            s.history.save(SavedConversation(id, HistoryStore.titleFor(msgs), createdAt, System.currentTimeMillis(), msgs))
+        }
+        _history.value = s.history.list()
+    }
+
+    private fun finishTurn() {
+        _ui.update { it.copy(busy = false, activity = if (s.speaker.speaking.value) Activity.SPEAKING else Activity.IDLE) }
+        persist()
     }
 
     private fun idleOr() = if (_ui.value.engine == EngineState.READY) Activity.IDLE else Activity.NO_MODEL
