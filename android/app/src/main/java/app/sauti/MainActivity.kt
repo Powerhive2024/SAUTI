@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
                         onImport = { pickModel.launch(arrayOf("*/*")) },
                         history = history,
                         onSaveHistory = { vm.setSaveHistory(it) },
+                        onPhotos = { vm.setPhotos(it) },
                         onDeleteAll = { vm.deleteAllHistory() },
                         onBack = { showSettings = false },
                     )

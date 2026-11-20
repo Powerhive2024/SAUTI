@@ -68,4 +68,19 @@
     <string name="delete_all">Futa historia yote</string>
     <string name="delete_all_title">Futa historia yote?</string>
     <string name="delete_all_body">Mazungumzo yote (%1$d) yatafutwa kwenye simu hii kabisa. Huwezi kuyarudisha.</string>
+    <!-- Picha na video: zinabaki kwenye simu hii tu -->
+    <string name="attach">Ongeza picha au video</string>
+    <string name="attach_photo">Picha kutoka galari</string>
+    <string name="attach_camera">Piga picha</string>
+    <string name="attach_video">Video kutoka galari</string>
+    <string name="attach_record">Rekodi video</string>
+    <string name="attach_remove">Ondoa</string>
+    <string name="attach_unavailable">Picha na video hazifanyi kazi kwenye simu hii</string>
+    <string name="attach_failed">Imeshindwa kufungua faili hiyo</string>
+    <string name="attach_limit">Ujumbe mmoja unaweza kubeba picha 5 tu (video ni picha 4)</string>
+    <string name="label_photo">Picha</string>
+    <string name="label_video">Video</string>
+    <string name="photos_title">Picha na video (majaribio)</string>
+    <string name="photos_note">Inaongeza kitufe cha picha na video kwenye mazungumzo. Inatumia kumbukumbu zaidi na kadi ya picha ya simu. Picha na video zinabaki kwenye simu hii tu. Ikiwa programu itafunga ghafla, ifungue tena: itazima kipengele hiki yenyewe.</string>
+    <string name="photos_unsupported">Simu hii haiwezi kuendesha picha na video. Maandishi na sauti bado yanafanya kazi.</string>
 </resources>

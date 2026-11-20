@@ -79,6 +79,24 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import app.sauti.media.AttachmentKind
 
 /** Which orb animation tells the user what Sauti is doing. */
 fun Activity.orb(): OrbState = when (this) {
@@ -217,12 +235,15 @@ fun ChatScreen(ui: UiState, vm: ChatViewModel, voiceMode: Boolean, onMic: () -> 
                 }
             }
 
-            if (voiceMode) VoiceBar(ui, vm, onMic) else Row(
+            AttachmentStrip(ui, vm)
+
+            if (voiceMode) VoiceBar(ui, vm, onMic, attach = { AttachButton(ui, vm) }) else Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
                     .clip(RoundedCornerShape(28.dp)).background(Sauti.surfaceHigh.copy(alpha = 0.75f))
                     .border(1.dp, Sauti.hairline, RoundedCornerShape(28.dp)).padding(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                AttachButton(ui, vm)
                 OutlinedTextField(
                     value = input, onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
@@ -235,7 +256,10 @@ fun ChatScreen(ui: UiState, vm: ChatViewModel, voiceMode: Boolean, onMic: () -> 
                     ),
                 )
                 Spacer(Modifier.size(6.dp))
-                FilledIconButton(onClick = { vm.send(input.trim()); input = "" }, enabled = !ui.busy && input.isNotBlank()) {
+                FilledIconButton(
+                    onClick = { vm.send(input.trim()); input = "" },
+                    enabled = !ui.busy && !ui.preparing && (input.isNotBlank() || ui.attachments.isNotEmpty()),
+                ) {
                     Icon(Icons.AutoMirrored.Filled.Send, stringResource(R.string.send))
                 }
             }
@@ -254,9 +278,94 @@ fun ChatScreen(ui: UiState, vm: ChatViewModel, voiceMode: Boolean, onMic: () -> 
     }
 }
 
+/**
+ * "+" button for photos and video: from the gallery, or new from the camera. The picked media is
+ * shrunk and kept in memory on this phone only, and sent with the next message.
+ */
+@Composable
+private fun AttachButton(ui: UiState, vm: ChatViewModel) {
+    if (!ui.vision) return // this phone (or model) can't see images: no button rather than one that fails
+    var open by remember { mutableStateOf(false) }
+    var pendingCapture by remember { mutableStateOf<android.net.Uri?>(null) }
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { vm.attach(it, AttachmentKind.PHOTO) }
+    }
+    val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { vm.attach(it, AttachmentKind.VIDEO) }
+    }
+    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        pendingCapture?.let { if (ok) vm.attach(it, AttachmentKind.PHOTO) }
+    }
+    val recordVideo = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { ok ->
+        pendingCapture?.let { if (ok) vm.attach(it, AttachmentKind.VIDEO) }
+    }
+    val enabled = ui.engine == EngineState.READY && !ui.busy && !ui.recording && !ui.preparing
+    Box {
+        IconButton(onClick = { open = true }, enabled = enabled) {
+            Icon(Icons.Default.AddPhotoAlternate, stringResource(R.string.attach), tint = if (enabled) Sauti.secondary else Sauti.outline)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.attach_photo)) },
+                leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) },
+                onClick = { open = false; pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.attach_camera)) },
+                leadingIcon = { Icon(Icons.Default.PhotoCamera, null) },
+                onClick = { open = false; vm.captureUri("jpg").also { pendingCapture = it; runCatching { takePhoto.launch(it) } } },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.attach_video)) },
+                leadingIcon = { Icon(Icons.Default.VideoLibrary, null) },
+                onClick = { open = false; pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.attach_record)) },
+                leadingIcon = { Icon(Icons.Default.Videocam, null) },
+                onClick = { open = false; vm.captureUri("mp4").also { pendingCapture = it; runCatching { recordVideo.launch(it) } } },
+            )
+        }
+    }
+}
+
+/** Previews of what will be sent with the next message, each removable; plus short notices. */
+@Composable
+private fun AttachmentStrip(ui: UiState, vm: ChatViewModel) {
+    val ctx = LocalContext.current
+    val notice = ui.notice?.let { stringResource(it) }
+    LaunchedEffect(ui.notice) {
+        if (notice != null) { Toast.makeText(ctx, notice, Toast.LENGTH_LONG).show(); vm.clearNotice() }
+    }
+    if (ui.attachments.isEmpty() && !ui.preparing) return
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ui.attachments.forEach { a ->
+            Box {
+                Image(
+                    a.thumb.asImageBitmap(), stringResource(if (a.kind == AttachmentKind.VIDEO) R.string.label_video else R.string.label_photo),
+                    Modifier.size(56.dp).clip(RoundedCornerShape(10.dp)).border(1.dp, Sauti.hairlineStrong, RoundedCornerShape(10.dp)),
+                    contentScale = ContentScale.Crop,
+                )
+                if (a.kind == AttachmentKind.VIDEO) Icon(Icons.Default.Videocam, null,
+                    Modifier.align(Alignment.BottomStart).padding(3.dp).size(16.dp), tint = Color.White)
+                Box(
+                    Modifier.align(Alignment.TopEnd).size(22.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.6f))
+                        .clickable { vm.removeAttachment(a.id) },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Default.Close, stringResource(R.string.attach_remove), Modifier.size(14.dp), tint = Color.White) }
+            }
+        }
+        if (ui.preparing) ThinkingOrb(OrbState.WORKING, size = 28.dp, preset = 20, dark = true, tint = Sauti.secondary)
+    }
+}
+
 /** Voice mode input: one big mic (no typing needed), plus "stop talking" while Sauti speaks. */
 @Composable
-private fun VoiceBar(ui: UiState, vm: ChatViewModel, onMic: () -> Unit) {
+private fun VoiceBar(ui: UiState, vm: ChatViewModel, onMic: () -> Unit, attach: @Composable () -> Unit = {}) {
     Column(Modifier.fillMaxWidth().padding(bottom = 12.dp, top = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         if (ui.activity == Activity.SPEAKING) {
             FilledTonalButton(onClick = { vm.stopSpeaking() }) {
@@ -267,6 +376,10 @@ private fun VoiceBar(ui: UiState, vm: ChatViewModel, onMic: () -> Unit) {
             Spacer(Modifier.height(8.dp))
         }
         val micOn = ui.engine == EngineState.READY && (!ui.busy || ui.recording)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+        // photo/video button beside the mic; an equal space on the right keeps the mic centred
+        Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) { attach() }
+        Spacer(Modifier.width(12.dp))
         Box(contentAlignment = Alignment.Center) {
             // radial aura behind the mic, cyan while recording
             Box(Modifier.size(112.dp).background(Brush.radialGradient(listOf(
@@ -288,6 +401,9 @@ private fun VoiceBar(ui: UiState, vm: ChatViewModel, onMic: () -> Unit) {
                     Modifier.size(34.dp), tint = if (micOn) Color.White else Sauti.outline,
                 )
             }
+        }
+        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.size(56.dp))
         }
         Spacer(Modifier.height(4.dp))
         Text(
@@ -311,6 +427,13 @@ private fun Bubble(m: ChatMessage, activity: Activity) {
         Column(horizontalAlignment = if (m.fromUser) Alignment.End else Alignment.Start) {
             if (!m.fromUser) Text(stringResource(R.string.app_name).uppercase(), style = Type.labelCaps, color = Sauti.outline,
                 modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+            if (m.thumbs.isNotEmpty()) Row(Modifier.padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                m.thumbs.forEach { t ->
+                    Image(t.asImageBitmap(), null,
+                        Modifier.size(84.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, Sauti.hairlineStrong, RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop)
+                }
+            }
             Surface(
                 shape = if (m.fromUser) RoundedCornerShape(18.dp, 4.dp, 18.dp, 18.dp) else RoundedCornerShape(18.dp),
                 color = if (m.fromUser) Sauti.surfaceHigh.copy(alpha = 0.6f) else Sauti.surfaceLow.copy(alpha = 0.6f),

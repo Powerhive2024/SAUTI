@@ -1,7 +1,14 @@
 package app.sauti.ui
 
 import android.app.Application
+import android.graphics.Bitmap
 import android.net.Uri
+import app.sauti.R
+import app.sauti.media.Attachment
+import app.sauti.media.AttachmentKind
+import app.sauti.media.MediaMath
+import app.sauti.media.MediaPrep
+import kotlinx.coroutines.Dispatchers
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.sauti.SautiApp
@@ -40,6 +47,8 @@ data class ChatMessage(
     val note: String? = null,
     /** Language Sauti answered in (mirrors the user). */
     val lang: Lang? = null,
+    /** Small previews of photos / video frames sent with this message (shown only; never saved). */
+    val thumbs: List<Bitmap> = emptyList(),
 )
 
 enum class EngineState { NO_MODEL, LOADING, READY, ERROR }
@@ -64,6 +73,14 @@ data class UiState(
     val importProgress: Float? = null,
     /** Id of the saved conversation on screen (null = new, not saved yet). */
     val conversationId: String? = null,
+    /** True when the loaded model can see photos and video on this phone. */
+    val vision: Boolean = false,
+    /** Photos / videos picked for the next message. */
+    val attachments: List<Attachment> = emptyList(),
+    /** True while a picked photo or video is being prepared. */
+    val preparing: Boolean = false,
+    /** A short message for the user (string resource id), e.g. a file that couldn't be opened. */
+    val notice: Int? = null,
 )
 
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
@@ -97,17 +114,18 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val st = s.settings.settings.first()
             val path = st.modelPath ?: s.models.list().firstOrNull { !s.models.isAdapter(it) }?.absolutePath
-            if (path != null) loadModel(path, st.loraPath)
+            if (path != null) loadModel(path, st.loraPath, st.photos)
         }
     }
 
-    fun loadModel(path: String, loraPath: String? = settings.value.loraPath) {
+    fun loadModel(path: String, loraPath: String? = settings.value.loraPath, photos: Boolean = settings.value.photos) {
         viewModelScope.launch {
             _ui.update { it.copy(engine = EngineState.LOADING, engineDetail = "", activity = Activity.LOADING_MODEL) }
-            runCatching { s.edge.load(path, loraPath) }
+            // The image encoder is opt-in (Settings) and needs extra memory: only on phones with about 6 GB RAM+.
+            runCatching { s.edge.load(path, loraPath, wantVision = photos && s.device.totalRamGb >= VISION_MIN_RAM_GB) }
                 .onSuccess {
                     s.settings.setModelPath(path)
-                    _ui.update { it.copy(engine = EngineState.READY, engineDetail = s.edge.backendName, activity = Activity.IDLE) }
+                    _ui.update { it.copy(engine = EngineState.READY, engineDetail = s.edge.backendName, activity = Activity.IDLE, vision = s.edge.visionReady) }
                 }
                 .onFailure { e -> _ui.update { it.copy(engine = EngineState.ERROR, engineDetail = e.message ?: "", activity = Activity.NO_MODEL) } }
         }
@@ -166,21 +184,68 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------------------------------------------------------------- photos & video (on this phone only)
+    /** Settings switch: reloads the model with (or without) the image encoder. */
+    fun setPhotos(on: Boolean) = viewModelScope.launch {
+        s.settings.setPhotos(on)
+        if (!on) _ui.update { it.copy(attachments = emptyList()) }
+        settings.value.modelPath?.let { loadModel(it, settings.value.loraPath, on) }
+    }
+
+    /** Prepares a picked or captured photo/video for the next message. Nothing leaves the phone. */
+    fun attach(uri: Uri, kind: AttachmentKind) {
+        val u = _ui.value
+        if (!u.vision) { _ui.update { it.copy(notice = R.string.attach_unavailable) }; return }
+        val room = MediaMath.MAX_IMAGES - u.attachments.sumOf { it.frames.size }
+        val need = if (kind == AttachmentKind.VIDEO) MediaMath.VIDEO_FRAMES else 1
+        if (room < need) { _ui.update { it.copy(notice = R.string.attach_limit) }; return }
+        _ui.update { it.copy(preparing = true) }
+        val aid = nextId++
+        viewModelScope.launch {
+            val app = getApplication<Application>()
+            runCatching {
+                withContext(Dispatchers.Default) {
+                    if (kind == AttachmentKind.PHOTO) MediaPrep.photo(app, uri, aid) else MediaPrep.video(app, uri, aid)
+                }
+            }.onSuccess { a -> _ui.update { it.copy(attachments = it.attachments + a, preparing = false) } }
+                .onFailure { _ui.update { it.copy(preparing = false, notice = R.string.attach_failed) } }
+        }
+    }
+
+    fun removeAttachment(id: Long) = _ui.update { u -> u.copy(attachments = u.attachments.filter { it.id != id }) }
+
+    fun clearNotice() = _ui.update { it.copy(notice = null) }
+
+    /** A private file the camera app writes a new photo or video into (deleted with the app's cache). */
+    fun captureUri(ext: String): Uri {
+        val app = getApplication<Application>()
+        val dir = java.io.File(app.cacheDir, "capture").apply { mkdirs() }
+        dir.listFiles()?.forEach { it.delete() } // only the latest capture is ever kept
+        val f = java.io.File(dir, "capture-${System.currentTimeMillis()}.$ext")
+        return androidx.core.content.FileProvider.getUriForFile(app, app.packageName + ".files", f)
+    }
+
     // ---------------------------------------------------------------- chat
     fun send(text: String, wav: ByteArray? = null) {
-        if (_ui.value.engine != EngineState.READY || _ui.value.busy) return
+        if (_ui.value.engine != EngineState.READY || _ui.value.busy || _ui.value.preparing) return
         stopSpeaking()
-        val userMsg = ChatMessage(nextId++, true, if (wav != null) "🎤 …" else text, spoken = wav != null)
-        _ui.update { it.copy(messages = it.messages + userMsg, busy = true) }
+        val atts = _ui.value.attachments
+        val images = atts.flatMap { it.frames }
+        val label = attachmentLabel(atts)
+        val shown = if (wav != null) "🎤 …" else listOfNotNull(label, text.ifBlank { null }).joinToString(" ")
+        val userMsg = ChatMessage(nextId++, true, shown, spoken = wav != null, thumbs = atts.map { it.thumb })
+        _ui.update { it.copy(messages = it.messages + userMsg, busy = true, attachments = emptyList()) }
         genJob = viewModelScope.launch {
             // Speech is understood on the phone first; only its transcript could ever go online.
             val question = if (wav != null) {
                 _ui.update { it.copy(activity = Activity.UNDERSTANDING) }
                 runCatching { s.edge.transcribe(wav) }.getOrDefault("").also { t ->
-                    replace(userMsg.id) { it.copy(text = "🎤 ${t.ifBlank { "…" }}") }
+                    replace(userMsg.id) { it.copy(text = listOfNotNull(label, "🎤 ${t.ifBlank { "…" }}").joinToString(" ")) }
                 }
             } else text
-            lang = LanguageDetector.detect(question, lang)
+            lang = if (question.isBlank()) lang else LanguageDetector.detect(question, lang)
+            // Photos and video never leave the phone: those messages are always answered on the device.
+            if (images.isNotEmpty()) { answerOnDevice(question, wav, images); return@launch }
             val d = s.router.decide(question, settings.value)
             when (d.route) {
                 Route.EDGE -> answerOnDevice(question, wav)
@@ -201,14 +266,14 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun answerOnDevice(question: String, wav: ByteArray?) {
+    private suspend fun answerOnDevice(question: String, wav: ByteArray?, images: List<ByteArray> = emptyList()) {
         val id = nextId++
         val replyLang = lang
         _ui.update { it.copy(messages = it.messages + ChatMessage(id, false, "", where = Where.DEVICE, lang = replyLang), activity = Activity.THINKING) }
         val sb = StringBuilder()
         var unspoken = ""
         runCatching {
-            s.edge.reply(question, wav, replyLang).collect { chunk ->
+            s.edge.reply(question, wav, replyLang, images).collect { chunk ->
                 if (sb.isEmpty()) _ui.update { it.copy(activity = Activity.ANSWERING) }
                 sb.append(chunk)
                 replace(id) { it.copy(text = sb.toString()) }
@@ -332,6 +397,23 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun idleOr() = if (_ui.value.engine == EngineState.READY) Activity.IDLE else Activity.NO_MODEL
+
+    /** "🖼 Picha" / "🎞 Video" tag shown (and saved) in place of the media itself. */
+    private fun attachmentLabel(atts: List<Attachment>): String? {
+        if (atts.isEmpty()) return null
+        val app = getApplication<Application>()
+        val photos = atts.count { it.kind == AttachmentKind.PHOTO }
+        val videos = atts.size - photos
+        return buildList {
+            if (photos > 0) add("🖼 " + app.getString(R.string.label_photo) + if (photos > 1) " ×$photos" else "")
+            if (videos > 0) add("🎞 " + app.getString(R.string.label_video) + if (videos > 1) " ×$videos" else "")
+        }.joinToString(" ") + " ·"
+    }
+
+    companion object {
+        /** Below this, the image encoder is skipped so text and voice keep enough memory. */
+        const val VISION_MIN_RAM_GB = 5.5
+    }
 
     private fun replace(id: Long, f: (ChatMessage) -> ChatMessage) =
         _ui.update { u -> u.copy(messages = u.messages.map { if (it.id == id) f(it) else it }) }

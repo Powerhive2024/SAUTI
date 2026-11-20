@@ -67,4 +67,19 @@
     <string name="delete_all">Delete all history</string>
     <string name="delete_all_title">Delete all history?</string>
     <string name="delete_all_body">Every saved conversation (%1$d) will be erased from this phone for good. This can\'t be undone.</string>
+    <!-- Photos and video: they stay on this phone -->
+    <string name="attach">Add a photo or video</string>
+    <string name="attach_photo">Photo from gallery</string>
+    <string name="attach_camera">Take a photo</string>
+    <string name="attach_video">Video from gallery</string>
+    <string name="attach_record">Record a video</string>
+    <string name="attach_remove">Remove</string>
+    <string name="attach_unavailable">Photos and video don\'t work on this phone</string>
+    <string name="attach_failed">Couldn\'t open that file</string>
+    <string name="attach_limit">One message can carry up to 5 images (a video counts as 4)</string>
+    <string name="label_photo">Photo</string>
+    <string name="label_video">Video</string>
+    <string name="photos_title">Photos and video (beta)</string>
+    <string name="photos_note">Adds a photo and video button to the chat. Uses more memory and the phone\'s graphics chip. Photos and video stay on this phone. If the app closes suddenly, open it again: it turns this off by itself.</string>
+    <string name="photos_unsupported">This phone can\'t run photos and video. Text and voice still work.</string>
 </resources>

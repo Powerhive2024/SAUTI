@@ -51,6 +51,7 @@ fun SettingsScreen(
     onImport: () -> Unit,
     history: List<ConversationSummary>,
     onSaveHistory: (Boolean) -> Unit,
+    onPhotos: (Boolean) -> Unit,
     onDeleteAll: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -75,6 +76,19 @@ fun SettingsScreen(
             Button(onClick = onImport) { Text(stringResource(R.string.import_model)) }
             ui.importProgress?.let { LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth()) }
             Text(stringResource(R.string.model_hint), style = MaterialTheme.typography.bodySmall)
+
+            // Photos and video (beta): opt-in, because it loads the image encoder on the phone's GPU
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            Row(
+                Modifier.fillMaxWidth().selectable(settings.photos) { onPhotos(!settings.photos) }.padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.photos_title), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                Switch(checked = settings.photos, onCheckedChange = onPhotos)
+            }
+            Text(stringResource(R.string.photos_note), style = MaterialTheme.typography.bodySmall)
+            if (settings.photos && ui.engine == EngineState.READY && !ui.vision)
+                Text(stringResource(R.string.photos_unsupported), style = MaterialTheme.typography.bodySmall, color = Sauti.error)
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             Text(stringResource(R.string.mode_title), style = MaterialTheme.typography.titleMedium)

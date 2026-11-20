@@ -24,6 +24,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import app.sauti.lang.Lang
 import app.sauti.lang.LanguageDetector
+import app.sauti.media.MediaMath as MediaLimits
 
 const val SYSTEM_PROMPT =
     "You are Sauti, a helpful assistant who speaks English, Kiswahili and Sheng. " +
@@ -33,7 +34,8 @@ const val SYSTEM_PROMPT =
         "Do not make up facts; if you do not know, say so."
 
 /**
- * On-device Gemma 3n via LiteRT-LM. Handles text and speech (16 kHz WAV) entirely offline.
+ * On-device Gemma 3n via LiteRT-LM. Handles text, speech (16 kHz WAV) and, on phones with room for
+ * the image encoder, photos and video frames, entirely offline.
  * Accepts either a fully merged fine-tuned .litertlm, or the base .litertlm + our LoRA adapter.
  */
 class EdgeEngine(private val context: Context) {
@@ -44,42 +46,73 @@ class EdgeEngine(private val context: Context) {
     private var seed: List<Message> = emptyList()
     var loadedPath: String? = null; private set
     var backendName: String = "-"; private set
+    /** True when Gemma 3n's image encoder loaded, so photos and video can be sent. */
+    var visionReady: Boolean = false; private set
 
     val isReady get() = conversation != null
 
-    suspend fun load(modelPath: String, loraPath: String?) = withContext(Dispatchers.IO) {
+    /**
+     * [wantVision] also loads the image encoder (extra memory, so only on phones with room for it).
+     * If the phone can't run it, Sauti still loads for text and voice.
+     */
+    suspend fun load(modelPath: String, loraPath: String?, wantVision: Boolean = false) = withContext(Dispatchers.IO) {
         lock.withLock {
-            if (loadedPath == modelPath && conversation != null) return@withLock
+            if (loadedPath == modelPath && conversation != null && visionReady == wantVision) return@withLock
             closeLocked()
             // Prefer GPU for text decoding where the phone supports it; fall back to CPU.
-            // LiteRT-LM currently runs Gemma 3n's audio encoder on CPU only.
-            val attempts = listOf<Pair<String, Backend>>("GPU" to Backend.GPU(), "CPU" to Backend.CPU())
+            // LiteRT-LM runs Gemma 3n's audio encoder on CPU. The image encoder prefers the GPU.
+            data class Try(val name: String, val backend: Backend, val vision: Backend?)
+            // Text always runs on the CPU: it works on every phone, while some GPU drivers crash the
+            // native runtime. The GPU is only tried for the image encoder, which requires it, and only
+            // when the user switched on "Photos and video".
+            val withVision = if (wantVision) listOf(Try("CPU", Backend.CPU(), Backend.GPU())) else emptyList()
+            val all = withVision + listOf(Try("CPU", Backend.CPU(), null))
+            // Crash guard: some GPU drivers crash inside the native runtime (no exception to catch).
+            // Each attempt is written down first; one still written down at the next start crashed,
+            // so it is skipped from then on. Text on CPU without vision is never skipped.
+            val marker = java.io.File(context.filesDir, "engine-attempt")
+            val crashedFile = java.io.File(context.filesDir, "engine-crashed")
+            if (marker.exists()) { crashedFile.appendText(marker.readText().trim() + "\n"); marker.delete() }
+            val crashed = if (crashedFile.exists()) crashedFile.readLines().map { it.trim() }.toSet() else emptySet()
+            fun key(a: Try) = "${a.name}/${if (a.vision == null) "none" else if (a.vision is Backend.GPU) "gpu" else "cpu"}"
+            val attempts = all.filter { key(it) !in crashed || key(it) == "CPU/none" }
+            if (crashed.isNotEmpty()) Log.w(TAG, "skipping options that crashed before: $crashed")
             var lastError: Throwable? = null
-            for ((name, backend) in attempts) {
+            for (a in attempts) {
+                var e: Engine? = null
+                marker.writeText(key(a))
                 try {
-                    val e = Engine(
+                    e = Engine(
                         EngineConfig(
                             modelPath = modelPath,
-                            backend = backend,
+                            backend = a.backend,
                             audioBackend = Backend.CPU(),
-                            // Vision is not used yet; leaving it unset skips loading the image
-                            // encoder (saves RAM on low-end phones; Google's file needs GPU for it).
-                            visionBackend = null,
+                            // Without vision the image encoder isn't loaded at all (saves RAM on small phones).
+                            visionBackend = a.vision,
                             maxNumTokens = 2048,
+                            maxNumImages = if (a.vision != null) MediaLimits.MAX_IMAGES else null,
                             cacheDir = context.cacheDir.path,
                         )
                     )
                     e.initialize()
+                    // Some backends (e.g. the image encoder on a GPU without support) only fail here,
+                    // so the first conversation is part of the attempt; on failure try the next option.
+                    val c = e.createConversation(conversationConfig(loraPath))
                     engine = e
-                    backendName = name
+                    conversation = c
+                    backendName = a.name
+                    visionReady = a.vision != null
+                    Log.i(TAG, "Engine ready: text on ${a.name}, vision ${if (a.vision != null) "on" else "off"}")
+                    marker.delete()
                     break
                 } catch (t: Throwable) {
-                    Log.w(TAG, "Engine init on $name failed", t)
+                    Log.w(TAG, "Engine init (${a.name}, vision=${a.vision != null}) failed", t)
+                    runCatching { e?.close() }
+                    marker.delete() // failed cleanly (no crash): may be tried again next time
                     lastError = t
                 }
             }
-            val e = engine ?: throw IllegalStateException("Could not load model", lastError)
-            conversation = e.createConversation(conversationConfig(loraPath))
+            if (conversation == null) throw IllegalStateException("Could not load model", lastError)
             loadedPath = modelPath
         }
     }
@@ -91,12 +124,19 @@ class EdgeEngine(private val context: Context) {
         loraConfig = loraPath?.let { LoraConfig(loraPath = it, audioLoraPath = it) },
     )
 
-    /** Streams the reply as text chunks. [wav] is optional speech (16 kHz mono PCM16 WAV). */
-    fun reply(text: String, wav: ByteArray?, lang: Lang? = null): Flow<String> {
+    /**
+     * Streams the reply as text chunks. [wav] is optional speech (16 kHz mono PCM16 WAV);
+     * [images] are optional JPEG photos or video frames (only when [visionReady]).
+     */
+    fun reply(text: String, wav: ByteArray?, lang: Lang? = null, images: List<ByteArray> = emptyList()): Flow<String> {
         val conv = conversation ?: throw IllegalStateException("Model not loaded")
         val parts = buildList {
+            if (visionReady) images.take(MediaLimits.MAX_IMAGES).forEach { add(Content.ImageBytes(it)) }
             if (wav != null) add(Content.AudioBytes(wav))
-            val ask = text.ifBlank { "Jibu kile kilichosemwa kwenye sauti hii." }
+            val ask = text.ifBlank {
+                if (images.isNotEmpty() && wav == null) "Eleza unachokiona kwenye picha hii, kwa ufupi."
+                else "Jibu kile kilichosemwa kwenye sauti hii."
+            }
             // hidden per-turn steer so the reply stays in the user's language
             add(Content.Text(if (lang != null) ask + "\n\n" + LanguageDetector.replyInstruction(lang) else ask))
         }
@@ -154,6 +194,7 @@ class EdgeEngine(private val context: Context) {
         conversation = null
         engine = null
         loadedPath = null
+        visionReady = false
     }
 
     companion object {
